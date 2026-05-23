@@ -12,7 +12,7 @@ def test_customer_checksum_changes():
     assert c1.checksum != c2.checksum
 
 def test_sale_checksum_ignores_pg_fields():
-    s1 = Sale(bill_id="B1", customer_id="C1", bill_date=datetime(2023, 1, 1), net_amount=100.0)
+    s1 = Sale(bill_id="B1", customer_id="C1", bill_date="2023-01-01", net_amount=100.0)
     # Theoretically if we had raw_id in the model (which we don't in domain model, but let's be sure)
     # The domain model is already clean by design.
     assert s1.checksum is not None

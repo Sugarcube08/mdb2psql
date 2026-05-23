@@ -96,16 +96,26 @@ class DataMapper:
 
         # Robust cleaning: extract just the date pattern
         import re
-        date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})|(\d{4}-\d{1,2}-\d{1,2})', raw_date)
+        # Support /, -, and . as separators
+        date_match = re.search(r'(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})|(\d{4}-\d{1,2}-\d{1,2})', raw_date)
         if date_match:
             raw_date = date_match.group(0)
 
+        # Normalize separators to / for easier parsing if needed, 
+        # but strptime needs exact matches for the format string.
+        # We'll just add the dot-based formats.
         formats = [
-            "%m/%d/%y",
-            "%m/%d/%Y",
             "%Y-%m-%d",
-            "%d/%m/%y",
             "%d/%m/%Y",
+            "%d/%m/%y",
+            "%m/%d/%Y",
+            "%m/%d/%y",
+            "%d-%m-%Y",
+            "%d-%m-%y",
+            "%m-%d-%Y",
+            "%m-%d-%y",
+            "%d.%m.%Y",
+            "%d.%m.%y",
         ]
 
         for fmt in formats:
@@ -133,6 +143,44 @@ class DataMapper:
             return None
 
     @staticmethod
+    def _decode_binary_timestamp(val: Any) -> Optional[str]:
+        """Decodes 16-byte MDB TIMESTAMP_STRUCT binary data."""
+        if not val:
+            return None
+        
+        raw_bytes = None
+        if isinstance(val, bytes):
+            raw_bytes = val
+        elif isinstance(val, str):
+            s_val = val.strip()
+            if s_val.startswith("b'") or s_val.startswith('b"'):
+                # Try to evaluate the bytes literal safely
+                import ast
+                try:
+                    raw_bytes = ast.literal_eval(s_val)
+                except Exception:
+                    pass
+            elif s_val.startswith("\\x"):
+                # Handle hex strings
+                try:
+                    raw_bytes = bytes.fromhex(s_val[2:])
+                except Exception:
+                    pass
+
+        if raw_bytes and len(raw_bytes) == 16:
+            import struct
+            try:
+                # SQL TIMESTAMP_STRUCT: year(h), month(h), day(h), hour(h), minute(h), second(h), fraction(I)
+                # All are little-endian
+                year, month, day, hour, minute, second, _ = struct.unpack("<hhhhhhI", raw_bytes)
+                if 1900 <= year <= 2100 and 1 <= month <= 12 and 1 <= day <= 31:
+                    return f"{year:04d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
+            except Exception:
+                pass
+        
+        return None
+
+    @staticmethod
     def map_to_domain(table_name: str, mdb_row: Dict[str, Any]) -> models.BaseEntity:
         config = DataMapper.MAPPING[table_name]
         mapped_data = {}
@@ -150,10 +198,26 @@ class DataMapper:
             if val is None:
                 val = row_lower.get(mdb_col.lower())
             
+            # Binary/Byte detection for dates
+            if domain_col in ["bill_date", "receipt_date"]:
+                decoded = DataMapper._decode_binary_timestamp(val)
+                if decoded:
+                    mapped_data[domain_col] = decoded
+                    continue
+
             if val is not None:
+                if isinstance(val, bytes):
+                    # Fallback for other bytes
+                    try:
+                        val = val.decode('utf-8', errors='ignore')
+                    except Exception:
+                        val = str(val)
+
                 s_val = str(val).strip()
                 if s_val.startswith("b'") or s_val.startswith('b"') or s_val.startswith("\\x"):
+                    # Only strip if it's not a binary date we care about (already handled above)
                     import re
+                    # Keep alphanumeric and common punctuation
                     val = re.sub(r'[^\x20-\x7E]', '', s_val)
                     val = re.sub(r"^b['\"](.*)['\"]$", r"\1", val)
                 else:
@@ -165,7 +229,8 @@ class DataMapper:
                         val = None
 
             if domain_col in ["bill_date", "receipt_date"]:
-                val = DataMapper._parse_date(val)
+                # User requested to just copy paste the dates as they are
+                pass
             elif domain_col in ["net_amount", "amount", "discount", "dis_amt"]:
                 val = DataMapper._parse_float(val)
                 

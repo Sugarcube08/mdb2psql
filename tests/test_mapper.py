@@ -7,7 +7,7 @@ def test_deterministic_raw_id():
     sale = Sale(
         bill_id="BILL001",
         customer_id="CUST001",
-        bill_date=datetime(2023, 1, 1),
+        bill_date="2023-01-01",
         net_amount=100.0,
         dis_amt=0.0
     )
@@ -22,7 +22,7 @@ def test_deterministic_raw_id():
     sale2 = Sale(
         bill_id="BILL002",
         customer_id="CUST001",
-        bill_date=datetime(2023, 1, 1),
+        bill_date="2023-01-01",
         net_amount=100.0,
         dis_amt=0.0
     )
@@ -33,7 +33,7 @@ def test_is_processed_flag():
     sale = Sale(
         bill_id="BILL001",
         customer_id="CUST001",
-        bill_date=datetime(2023, 1, 1),
+        bill_date="2023-01-01",
         net_amount=100.0,
         dis_amt=0.0
     )

@@ -59,14 +59,14 @@ class City(BaseEntity):
 class Sale(BaseEntity):
     bill_id: str
     customer_id: Optional[str] = None
-    bill_date: Optional[date] = None
+    bill_date: Optional[str] = None
     net_amount: Optional[float] = None
     dis_amt: Optional[float] = None
 
 class Receipt(BaseEntity):
     receipt_id: str
     customer_id: Optional[str] = None
-    receipt_date: Optional[date] = None
+    receipt_date: Optional[str] = None
     amount: Optional[float] = None
     discount: Optional[float] = None
     bank_name: Optional[str] = None

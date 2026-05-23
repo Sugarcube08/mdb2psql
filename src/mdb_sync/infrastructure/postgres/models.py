@@ -35,7 +35,7 @@ class RawSale(Base, IngestionMixin):
     __tablename__ = "raw_sales"
     bill_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     customer_id: Mapped[Optional[str]] = mapped_column(Text)
-    bill_date: Mapped[Optional[datetime]] = mapped_column(Date)
+    bill_date: Mapped[Optional[str]] = mapped_column(Text)
     net_amount: Mapped[Optional[float]] = mapped_column(Numeric)
     dis_amt: Mapped[Optional[float]] = mapped_column(Numeric)
 
@@ -43,7 +43,7 @@ class RawReceipt(Base, IngestionMixin):
     __tablename__ = "raw_receipts"
     receipt_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     customer_id: Mapped[Optional[str]] = mapped_column(Text)
-    receipt_date: Mapped[Optional[datetime]] = mapped_column(Date)
+    receipt_date: Mapped[Optional[str]] = mapped_column(Text)
     amount: Mapped[Optional[float]] = mapped_column(Numeric)
     discount: Mapped[Optional[float]] = mapped_column(Numeric)
     bank_name: Mapped[Optional[str]] = mapped_column(Text)

@@ -36,13 +36,14 @@ class Settings(BaseSettings):
     SOURCE_SYSTEM: str = "BILLING_MDB"
     
     # Pruning
-    PRUNE_INTERVAL_SECONDS: int = 86400  # Default 1 day
+    PRUNE_INTERVAL_SECONDS: int = 3600  # Default 1 hour, but run_once overrides to every cycle
+    PRUNE_RETENTION_DAYS_PROCESSED: int = 0 # Default to 0 for immediate cleanup of processed rows
     RETENTION_DAYS_SALES: int = 30
     RETENTION_DAYS_RECEIPTS: int = 30
     RETENTION_DAYS_RG: int = 30
 
     # Logging
-    LOG_LEVEL: str = "info"
+    LOG_LEVEL: str = "debug"
     LOG_FORMAT: str = "auto"  # "auto", "json", or "console"
 
 settings = Settings()

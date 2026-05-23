@@ -72,15 +72,11 @@ class SyncScheduler:
     def run_pruning(self) -> dict:
         logger.info("Starting pruning cycle")
         prune_results = {}
-        prune_targets = [
-            ("raw_sales", settings.RETENTION_DAYS_SALES),
-            ("raw_receipts", settings.RETENTION_DAYS_RECEIPTS),
-            ("raw_rg", settings.RETENTION_DAYS_RG),
-            ("raw_customers", 30),
-            ("raw_cities", 30)
-        ]
+        # We now use a global retention for processed rows as requested
+        retention = settings.PRUNE_RETENTION_DAYS_PROCESSED
+        prune_targets = ["raw_sales", "raw_receipts", "raw_rg", "raw_customers", "raw_cities"]
         
-        for table, retention in prune_targets:
+        for table in prune_targets:
             if self._stop_event.is_set():
                 break
             with SessionLocal() as db:
@@ -105,10 +101,8 @@ class SyncScheduler:
         logger.debug("Starting parallel sync cycle")
         
         # 1. Pruning (Priority: Cleanup first)
-        prune_summary = None
-        now = datetime.now(timezone.utc)
-        if self._last_prune_at is None or (now - self._last_prune_at).total_seconds() >= self.prune_interval:
-            prune_summary = self.run_pruning()
+        # We now run pruning on every cycle as requested by the user
+        prune_summary = self.run_pruning()
 
         # 2. Prepare Sync Tasks
         tasks = []

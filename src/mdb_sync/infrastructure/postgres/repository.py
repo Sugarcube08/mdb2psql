@@ -1,17 +1,64 @@
 from typing import Optional, Type, TypeVar
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
-from src.mdb_sync.infrastructure.postgres.models import Base, SyncState, SyncFingerprint
-from datetime import datetime, timezone
-
-T = TypeVar("T", bound=Base)
+from src.mdb_sync.infrastructure.postgres.models import Base, SyncState, SyncFingerprint, ExternalLock
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import select, delete
 
 def utcnow():
     return datetime.now(timezone.utc)
 
+T = TypeVar("T", bound=Base)
+
 class PostgresRepository:
     def __init__(self, session: Session):
         self.session = session
+
+    def acquire_lock(self, lock_name: str, locked_by: str, timeout_minutes: int = 10) -> bool:
+        """Tries to acquire a named lock. Returns True if successful."""
+        now = utcnow()
+        expires_at = now + timedelta(minutes=timeout_minutes)
+        
+        # 1. Clean up expired locks first
+        self.session.execute(
+            delete(ExternalLock).where(ExternalLock.expires_at < now)
+        )
+        
+        # 2. Check if lock is currently held
+        existing = self.session.execute(
+            select(ExternalLock).where(ExternalLock.lock_name == lock_name)
+        ).scalar_one_or_none()
+        
+        if existing:
+            if existing.locked_by == locked_by:
+                # We already have it, extend it
+                existing.expires_at = expires_at
+                return True
+            return False
+            
+        # 3. Try to insert
+        try:
+            new_lock = ExternalLock(
+                lock_name=lock_name,
+                locked_by=locked_by,
+                acquired_at=now,
+                expires_at=expires_at
+            )
+            self.session.add(new_lock)
+            self.session.flush() # Check for integrity errors
+            return True
+        except Exception:
+            self.session.rollback()
+            return False
+
+    def release_lock(self, lock_name: str, locked_by: str):
+        """Releases a named lock if held by the caller."""
+        self.session.execute(
+            delete(ExternalLock).where(
+                ExternalLock.lock_name == lock_name,
+                ExternalLock.locked_by == locked_by
+            )
+        )
 
     def upsert_batch(self, model_class: Type[T], data_list: list[dict], unique_col: str):
         if not data_list:

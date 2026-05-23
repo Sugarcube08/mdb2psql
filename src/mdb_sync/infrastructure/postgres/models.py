@@ -74,3 +74,10 @@ class SyncState(Base):
     last_reconcile_pk: Mapped[Optional[str]] = mapped_column(Text)
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ExternalLock(Base):
+    __tablename__ = "sync_locks"
+    lock_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    locked_by: Mapped[str] = mapped_column(Text, nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

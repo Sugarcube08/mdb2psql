@@ -98,66 +98,102 @@ class SyncScheduler:
 
     def run_once(self):
         start_time = datetime.now(timezone.utc)
-        logger.debug("Starting parallel sync cycle")
+        from datetime import timedelta
         
-        # 1. Pruning (Priority: Cleanup first)
-        # We now run pruning on every cycle as requested by the user
-        prune_summary = self.run_pruning()
-
-        # 2. Prepare Sync Tasks
-        tasks = []
-        # Master Tables
-        master_tables = ["City_Master", "CUSTOMER_MASTER"]
-        for table in master_tables:
-            tasks.append((table, "full"))
-
-        # Transactional Tables
-        transactional_tables = ["BILL_MASTER", "Receipt_Master", "ReturnGoods"]
-        for table in transactional_tables:
-            tasks.append((table, "incremental"))
-            tasks.append((table, "reconcile"))
-
-        # 3. Execute Sync Parallelly
-        cycle_results = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_task = {executor.submit(self._sync_table_isolated, t, m): (t, m) for t, m in tasks}
+        # 1. ACQUIRE GLOBAL MDB LOCK (POSTGRES-BASED)
+        # This prevents concurrent access between dbupdater and intelligence system
+        lock_acquired = False
+        wait_start = datetime.now(timezone.utc)
+        max_wait = timedelta(minutes=settings.LOCK_MAX_WAIT_MINUTES)
+        
+        while not lock_acquired and not self._stop_event.is_set():
+            with SessionLocal() as db:
+                pg_repo = PostgresRepository(db)
+                lock_acquired = pg_repo.acquire_lock("MDB_FILE_LOCK", "dbupdater", timeout_minutes=20)
+                db.commit()
             
-            for future in as_completed(future_to_task):
-                try:
-                    result = future.result()
-                    if result:
-                        cycle_results.append(result)
-                except Exception as e:
-                    t, m = future_to_task[future]
-                    err_msg = str(e).split('\n')[0]
-                    cycle_results.append({"table": t, "mode": m, "error": err_msg, "errors": 1})
+            if not lock_acquired:
+                elapsed = datetime.now(timezone.utc) - wait_start
+                if elapsed > max_wait:
+                    logger.warning("Timed out waiting for MDB lock. Skipping this cycle.", waited_sec=elapsed.total_seconds())
+                    return
+                
+                logger.info("MDB file is currently locked. Retrying soon...", 
+                            waited_sec=round(elapsed.total_seconds()),
+                            retry_in=settings.LOCK_RETRY_INTERVAL_SECONDS)
+                self._stop_event.wait(settings.LOCK_RETRY_INTERVAL_SECONDS)
 
-        # Final Cycle Summary
-        duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-        total_scanned = sum(r.get("scanned", 0) for r in cycle_results)
-        total_upserted = sum(r.get("upserted", 0) + r.get("updated", 0) for r in cycle_results)
-        total_errors = sum(r.get("errors", 0) for r in cycle_results)
-        
-        failed_tables = [f"{r['table']} ({r['mode']})" for r in cycle_results if "error" in r]
-        
-        rows_per_sec = total_scanned / duration if duration > 0 else 0
-        
-        log_data = {
-            "duration_sec": round(duration, 2),
-            "rows_per_sec": round(rows_per_sec, 2),
-            "scanned": total_scanned,
-            "upserted": total_upserted,
-            "errors": total_errors,
-        }
-        if failed_tables:
-            log_data["failed_tasks"] = failed_tables
-        if prune_summary:
-            log_data["pruning"] = prune_summary
+        if self._stop_event.is_set():
+            return
 
-        if total_errors > 0 or failed_tables:
-            logger.warning("Sync cycle completed with issues", **log_data)
-        else:
-            logger.info("Sync cycle completed successfully", **log_data)
+        try:
+            logger.debug("Starting parallel sync cycle")
+            
+            # 2. Pruning (Priority: Cleanup first)
+            # We now run pruning on every cycle as requested by the user
+            prune_summary = self.run_pruning()
+
+            # 3. Prepare Sync Tasks
+            tasks = []
+            # Master Tables
+            master_tables = ["City_Master", "CUSTOMER_MASTER"]
+            for table in master_tables:
+                tasks.append((table, "full"))
+
+            # Transactional Tables
+            transactional_tables = ["BILL_MASTER", "Receipt_Master", "ReturnGoods"]
+            for table in transactional_tables:
+                tasks.append((table, "incremental"))
+                tasks.append((table, "reconcile"))
+
+            # 4. Execute Sync Parallelly
+            cycle_results = []
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_task = {executor.submit(self._sync_table_isolated, t, m): (t, m) for t, m in tasks}
+                
+                for future in as_completed(future_to_task):
+                    try:
+                        result = future.result()
+                        if result:
+                            cycle_results.append(result)
+                    except Exception as e:
+                        t, m = future_to_task[future]
+                        err_msg = str(e).split('\n')[0]
+                        cycle_results.append({"table": t, "mode": m, "error": err_msg, "errors": 1})
+
+            # Final Cycle Summary
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            total_scanned = sum(r.get("scanned", 0) for r in cycle_results)
+            total_upserted = sum(r.get("upserted", 0) + r.get("updated", 0) for r in cycle_results)
+            total_errors = sum(r.get("errors", 0) for r in cycle_results)
+            
+            failed_tables = [f"{r['table']} ({r['mode']})" for r in cycle_results if "error" in r]
+            
+            rows_per_sec = total_scanned / duration if duration > 0 else 0
+            
+            log_data = {
+                "duration_sec": round(duration, 2),
+                "rows_per_sec": round(rows_per_sec, 2),
+                "scanned": total_scanned,
+                "upserted": total_upserted,
+                "errors": total_errors,
+            }
+            if failed_tables:
+                log_data["failed_tasks"] = failed_tables
+            if prune_summary:
+                log_data["pruning"] = prune_summary
+
+            if total_errors > 0 or failed_tables:
+                logger.warning("Sync cycle completed with issues", **log_data)
+            else:
+                logger.info("Sync cycle completed successfully", **log_data)
+        
+        finally:
+            # 5. RELEASE GLOBAL MDB LOCK
+            with SessionLocal() as db:
+                pg_repo = PostgresRepository(db)
+                pg_repo.release_lock("MDB_FILE_LOCK", "dbupdater")
+                db.commit()
 
     def start(self):
         logger.info("Starting scheduler", interval=self.interval, prune_interval=self.prune_interval)

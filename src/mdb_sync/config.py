@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     RECONCILIATION_CHUNK_LIMIT: int = 5000
     SOURCE_SYSTEM: str = "BILLING_MDB"
     
+    # Locking
+    LOCK_RETRY_INTERVAL_SECONDS: int = 30
+    LOCK_MAX_WAIT_MINUTES: int = 60 # Allow waiting for long intelligence runs
+    
     # Pruning
     PRUNE_INTERVAL_SECONDS: int = 3600  # Default 1 hour, but run_once overrides to every cycle
     PRUNE_RETENTION_DAYS_PROCESSED: int = 0 # Default to 0 for immediate cleanup of processed rows

@@ -10,6 +10,7 @@ data/
 # Virtual environments
 .venv
 *.txt
+*.log
 .env
 migrations/
 logs/

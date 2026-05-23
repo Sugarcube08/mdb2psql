@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 import os
 
@@ -33,9 +32,17 @@ class Settings(BaseSettings):
     # Sync
     SYNC_INTERVAL_SECONDS: int = 3600
     RECONCILIATION_WINDOW_ROWS: int = 5000
+    RECONCILIATION_CHUNK_LIMIT: int = 5000
     SOURCE_SYSTEM: str = "BILLING_MDB"
+    
+    # Pruning
+    PRUNE_INTERVAL_SECONDS: int = 86400  # Default 1 day
+    RETENTION_DAYS_SALES: int = 30
+    RETENTION_DAYS_RECEIPTS: int = 30
+    RETENTION_DAYS_RG: int = 30
 
     # Logging
     LOG_LEVEL: str = "info"
+    LOG_FORMAT: str = "auto"  # "auto", "json", or "console"
 
 settings = Settings()

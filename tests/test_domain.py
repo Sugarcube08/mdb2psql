@@ -1,4 +1,3 @@
-import pytest
 from datetime import datetime
 from src.mdb_sync.domain.models import Customer, Sale
 

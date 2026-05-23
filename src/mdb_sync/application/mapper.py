@@ -1,6 +1,8 @@
-from typing import Dict, Any, Type, List
+from typing import Dict, Any, Type, List, Optional
+from datetime import datetime
 from src.mdb_sync.domain import models
 from src.mdb_sync.infrastructure.postgres import models as pg_models
+from src.mdb_sync.logging_config import logger
 
 class DataMapper:
     MAPPING = {
@@ -70,11 +72,46 @@ class DataMapper:
     }
 
     @staticmethod
+    def _parse_date(val: Any) -> Optional[datetime]:
+        if val is None:
+            return None
+        if isinstance(val, datetime):
+            return val
+        
+        # Try parsing from string (common for mdbtools/invalid dates)
+        try:
+            # mdbtools often returns YYYY-MM-DD HH:MM:SS
+            # Stripping everything after seconds in case of microseconds
+            clean_val = str(val).split(".")[0]
+            return datetime.strptime(clean_val, "%Y-%m-%d %H:%M:%S")
+        except:
+            try:
+                # Try simple date
+                date_part = str(val).split(" ")[0]
+                return datetime.strptime(date_part, "%Y-%m-%d")
+            except:
+                logger.warning("Could not parse date", value=val)
+                return None
+
+    @staticmethod
     def map_to_domain(table_name: str, mdb_row: Dict[str, Any]) -> models.BaseEntity:
         config = DataMapper.MAPPING[table_name]
         mapped_data = {}
+        
+        # Create a lowercase mapping of the mdb_row keys for case-insensitive lookup
+        row_lower = {k.lower(): v for k, v in mdb_row.items()}
+        
         for mdb_col, domain_col in config["fields"].items():
-            mapped_data[domain_col] = mdb_row.get(mdb_col)
+            # Try exact match first, then case-insensitive
+            val = mdb_row.get(mdb_col)
+            if val is None:
+                val = row_lower.get(mdb_col.lower())
+            
+            # Special handling for dates
+            if domain_col in ["bill_date", "receipt_date"]:
+                val = DataMapper._parse_date(val)
+                
+            mapped_data[domain_col] = val
         
         return config["model"](**mapped_data)
 

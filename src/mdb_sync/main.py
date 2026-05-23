@@ -12,13 +12,7 @@ def main():
 
     try:
         mdb_repo = MDBRepository()
-        
-        # Use a single session for the main loop or create per cycle?
-        # Creating a session and keeping it for the scheduler
-        db = SessionLocal()
-        pg_repo = PostgresRepository(db)
-        
-        sync_engine = SyncEngine(mdb_repo, pg_repo)
+        sync_engine = SyncEngine(mdb_repo)
         scheduler = SyncScheduler(sync_engine)
         
         scheduler.start()

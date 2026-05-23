@@ -2,10 +2,10 @@ import hashlib
 import json
 from datetime import datetime
 from typing import Optional, Any, Dict
-from pydantic import BaseModel, Field, ConfigDict, computed_field
+from pydantic import BaseModel, Field, ConfigDict, computed_field, field_validator
 
 class BaseEntity(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, coerce_numbers_to_str=True)
 
     @computed_field
     def checksum(self) -> str:

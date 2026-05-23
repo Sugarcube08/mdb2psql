@@ -1,19 +1,26 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+import os
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Postgres
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "mdb_sync"
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
+    POSTGRES_URI: str = "postgresql://postgres:postgres@localhost:5432/mdb_sync"
 
     @property
     def postgres_url(self) -> str:
-        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        # Detect if running inside Docker
+        is_docker = os.path.exists("/.dockerenv") or os.environ.get("IS_DOCKER", "false") == "true"
+        
+        if is_docker:
+            # URI is used as provided in .env (targeting graphora-postgres)
+            return self.POSTGRES_URI
+        else:
+            # For local tools (Alembic), swap internal host with localhost
+            # This allows the same .env to work for both
+            return self.POSTGRES_URI.replace("@graphora-postgres", "@localhost")
 
     # MDB
     MDB_PATH: str = "./data/raw/Billing.mdb"

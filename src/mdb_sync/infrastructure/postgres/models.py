@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Boolean, DateTime, Numeric, Text, PrimaryKeyConstraint, Date
+from sqlalchemy import Boolean, DateTime, Numeric, Text, PrimaryKeyConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 

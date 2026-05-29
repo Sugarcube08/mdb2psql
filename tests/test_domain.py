@@ -1,4 +1,3 @@
-from datetime import datetime
 from src.mdb_sync.domain.models import Customer, Sale
 
 def test_customer_checksum_deterministic():

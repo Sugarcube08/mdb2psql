@@ -14,7 +14,7 @@ To run the MDB Sync Platform as a persistent background service on Windows that 
 
 ## 1. Setup Environment
 
-1.  Clone the repository to your target folder (e.g., `C:\Graphora\dbupdater`).
+1.  Clone the repository to your target folder (e.g., `C:\vgis\dbupdater`).
 2.  Open PowerShell in that folder.
 3.  Create and activate a virtual environment:
     ```powershell

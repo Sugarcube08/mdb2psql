@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: infra/worker/Dockerfile
     container_name: mdb_sync_worker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./.env:/app/.env

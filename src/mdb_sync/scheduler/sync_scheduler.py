@@ -2,7 +2,7 @@ import threading
 import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 from src.mdb_sync.application.sync_engine import SyncEngine
 from src.mdb_sync.logging_config import get_logger
 
@@ -11,7 +11,6 @@ from src.mdb_sync.config import settings
 from src.mdb_sync.infrastructure.postgres.database import SessionLocal
 from src.mdb_sync.infrastructure.postgres.repository import PostgresRepository
 
-from src.mdb_sync.concurrency import mdb_lock
 
 class SyncScheduler:
     def __init__(self, sync_engine: SyncEngine):

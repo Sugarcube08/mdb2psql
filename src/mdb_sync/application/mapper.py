@@ -20,6 +20,7 @@ class DataMapper:
                 "BILL_DATE": "bill_date",
                 "NET_AMOUNT": "net_amount",
                 "Dis_Amt": "dis_amt",
+                "is_Ok": "is_ok",
             }
         },
         "Receipt_Master": {
@@ -35,6 +36,7 @@ class DataMapper:
                 "Discount": "discount",
                 "Bank_Name": "bank_name",
                 "Receipt_Type": "receipt_type",
+                "is_Ok": "is_ok",
             }
         },
         "ReturnGoods": {
@@ -48,6 +50,7 @@ class DataMapper:
                 "RGTYPE": "rgtype",
                 "BILL_DATE": "bill_date",
                 "NET_AMOUNT": "net_amount",
+                "is_Ok": "is_ok",
             }
         },
 
@@ -61,6 +64,7 @@ class DataMapper:
                 "CUSTOMER_NAME": "customer_name",
                 "City_ID": "city_id",
                 "MOBILE1": "mobile1",
+                "Opening_Balance": "opening_balance",
             }
         },
         "City_Master": {
@@ -193,6 +197,32 @@ class DataMapper:
             return None
 
     @staticmethod
+    def _parse_int(val: Any) -> Optional[int]:
+        if val is None or val == "":
+            return None
+        
+        if isinstance(val, bool):
+            return 1 if val else 0
+            
+        try:
+            s_val = str(val).strip().lower()
+            if s_val in ["true", "yes", "y", "-1"]:
+                return 1
+            if s_val in ["false", "no", "n"]:
+                return 0
+                
+            import re
+            numeric_match = re.search(r'[-+]?\d+', s_val)
+            if numeric_match:
+                res = int(numeric_match.group(0))
+                # In many systems (like Access/MDB), -1 is True, 0 is False.
+                # We map any non-zero to 1 for is_ok
+                return 1 if res != 0 else 0
+            return None
+        except Exception:
+            return None
+
+    @staticmethod
     def _decode_binary_timestamp(val: Any) -> Optional[str]:
         """Decodes 16-byte MDB TIMESTAMP_STRUCT binary data."""
         if not val:
@@ -239,21 +269,26 @@ class DataMapper:
         row_keys_lower = [k.lower() for k in mdb_row.keys()]
         
         for mdb_col, domain_col in config["fields"].items():
-            if mdb_col.lower() not in row_keys_lower:
+            val = None
+            if mdb_col.lower() in row_keys_lower:
+                val = mdb_row.get(mdb_col)
+                if val is None:
+                    val = row_lower.get(mdb_col.lower())
+            else:
                 logger.debug("COLUMN MISSING IN MDB ROW", table=table_name, column=mdb_col, available_columns=list(mdb_row.keys()))
-                mapped_data[domain_col] = None
-                continue
-
-            val = mdb_row.get(mdb_col)
-            if val is None:
-                val = row_lower.get(mdb_col.lower())
             
             # Binary/Byte detection for dates
-            if domain_col in ["bill_date", "receipt_date"]:
+            if domain_col in ["bill_date", "receipt_date"] and val is not None:
                 decoded = DataMapper._decode_binary_timestamp(val)
                 if decoded:
-                    mapped_data[domain_col] = decoded
-                    continue
+                    val = decoded
+
+            if domain_col == "is_ok":
+                val = DataMapper._parse_int(val)
+                if val is None:
+                    val = 0
+                mapped_data[domain_col] = val
+                continue
 
             if val is not None:
                 if isinstance(val, bytes):
@@ -281,7 +316,7 @@ class DataMapper:
             if domain_col in ["bill_date", "receipt_date"]:
                 # User requested to just copy paste the dates as they are
                 pass
-            elif domain_col in ["net_amount", "amount", "discount", "dis_amt"]:
+            elif domain_col in ["net_amount", "amount", "discount", "dis_amt", "opening_balance"]:
                 val = DataMapper._parse_float(val)
                 
             mapped_data[domain_col] = val

@@ -50,6 +50,7 @@ class Customer(BaseEntity):
     customer_name: Optional[str] = None
     city_id: Optional[str] = None
     mobile1: Optional[str] = None
+    opening_balance: Optional[float] = None
 
 class City(BaseEntity):
     city_id: str
@@ -62,6 +63,7 @@ class Sale(BaseEntity):
     bill_date: Optional[str] = None
     net_amount: Optional[float] = None
     dis_amt: Optional[float] = None
+    is_ok: Optional[int] = 0
 
 class Receipt(BaseEntity):
     receipt_id: str
@@ -71,6 +73,7 @@ class Receipt(BaseEntity):
     discount: Optional[float] = None
     bank_name: Optional[str] = None
     receipt_type: Optional[str] = None
+    is_ok: Optional[int] = 0
 
 class RG(BaseEntity):
     rg_id: str
@@ -78,4 +81,5 @@ class RG(BaseEntity):
     rgtype: Optional[str] = None
     bill_date: Optional[str] = None
     net_amount: Optional[float] = None
+    is_ok: Optional[int] = 0
 

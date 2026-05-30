@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Boolean, DateTime, Numeric, Text, PrimaryKeyConstraint
+from sqlalchemy import Boolean, DateTime, Numeric, Text, PrimaryKeyConstraint, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -24,6 +24,7 @@ class RawCustomer(Base, IngestionMixin):
     customer_name: Mapped[Optional[str]] = mapped_column(Text)
     city_id: Mapped[Optional[str]] = mapped_column(Text)
     mobile1: Mapped[Optional[str]] = mapped_column(Text)
+    opening_balance: Mapped[Optional[float]] = mapped_column(Numeric)
 
 class RawCity(Base, IngestionMixin):
     __tablename__ = "raw_cities"
@@ -38,6 +39,7 @@ class RawSale(Base, IngestionMixin):
     bill_date: Mapped[Optional[str]] = mapped_column(Text)
     net_amount: Mapped[Optional[float]] = mapped_column(Numeric)
     dis_amt: Mapped[Optional[float]] = mapped_column(Numeric)
+    is_ok: Mapped[int] = mapped_column(Integer, default=0)
 
 class RawReceipt(Base, IngestionMixin):
     __tablename__ = "raw_receipts"
@@ -48,6 +50,7 @@ class RawReceipt(Base, IngestionMixin):
     discount: Mapped[Optional[float]] = mapped_column(Numeric)
     bank_name: Mapped[Optional[str]] = mapped_column(Text)
     receipt_type: Mapped[Optional[str]] = mapped_column(Text)
+    is_ok: Mapped[int] = mapped_column(Integer, default=0)
 
 class RawRG(Base):
     __tablename__ = "raw_rg"
@@ -62,6 +65,7 @@ class RawRG(Base):
     rgtype: Mapped[Optional[str]] = mapped_column(Text)
     bill_date: Mapped[Optional[str]] = mapped_column(Text)
     net_amount: Mapped[Optional[float]] = mapped_column(Numeric)
+    is_ok: Mapped[int] = mapped_column(Integer, default=0)
 
 class SyncFingerprint(Base):
     __tablename__ = "sync_fingerprints"

@@ -1,0 +1,40 @@
+# Use Windows Server Core with Python 3.12
+FROM python:3.12-windowsservercore-ltsc2022
+
+# Set shell to PowerShell for easier command execution
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# 1. Install Microsoft Access Database Engine 2016 Redistributable
+# We need this for official MDB/ACCDB support on Windows containers
+RUN Invoke-WebRequest -Uri "https://download.microsoft.com/download/3/5/C/35C5D6F5-073F-4316-AD9C-60803EC03440/AccessDatabaseEngine_X64.exe" -OutFile "AccessDatabaseEngine_X64.exe" ; \
+    Start-Process -FilePath "AccessDatabaseEngine_X64.exe" -ArgumentList "/quiet" -Wait ; \
+    Remove-Item "AccessDatabaseEngine_X64.exe"
+
+# 2. Install uv (Python package manager)
+# Use the official install script for Windows
+RUN iex (irm https://astral.sh/uv/install.ps1)
+
+# Set working directory
+WORKDIR C:\app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# 3. Install dependencies using uv
+RUN & \"$env:USERPROFILE\.cargo\bin\uv\" sync --frozen --no-cache
+
+# Copy source code
+COPY src ./src
+
+# Set environment variables
+ENV POSTGRES_HOST=host.docker.internal
+ENV POSTGRES_PORT=5432
+ENV MDB_DRIVER="{Microsoft Access Driver (*.mdb, *.accdb)}"
+ENV PYTHONPATH=C:\app
+ENV IS_DOCKER=true
+
+# Create a logs directory
+RUN New-Item -ItemType Directory -Path C:\app\logs
+
+# Run the application
+CMD ["powershell", "-Command", "& \"$env:USERPROFILE\\.cargo\\bin\\uv\" run python -m src.mdb_sync.main"]

@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: infra/worker/Dockerfile.windows
+    volumes:
+      # Mount the folder containing your MDB files
+      # Replace 'C:/Path/To/Data' with the actual host path
+      - type: bind
+        source: C:/data
+        target: C:/data
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=host.docker.internal # Connect to Postgres on the host
+      - MDB_PATH=C:/data/Billing.mdb        # Path inside the container
+    restart: always

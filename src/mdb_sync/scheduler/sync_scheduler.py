@@ -91,8 +91,33 @@ class SyncScheduler:
                     logger.error("Pruning failed", table=table, error=err_msg)
                     prune_results[table] = f"Error: {err_msg}"
         
+        # Log Cleanup: Remove log files older than 7 days
+        self._cleanup_old_logs(days=7)
+        
         self._last_prune_at = datetime.now(timezone.utc)
         return prune_results
+
+    def _cleanup_old_logs(self, days: int = 7):
+        """Removes log files in the 'logs' directory older than the specified number of days."""
+        import os
+        import time
+        log_dir = "logs"
+        if not os.path.exists(log_dir):
+            return
+
+        now = time.time()
+        cutoff = now - (days * 86400)
+        
+        try:
+            for filename in os.listdir(log_dir):
+                file_path = os.path.join(log_dir, filename)
+                if os.path.isfile(file_path):
+                    file_mtime = os.path.getmtime(file_path)
+                    if file_mtime < cutoff:
+                        os.remove(file_path)
+                        logger.info("Removed old log file", filename=filename)
+        except Exception as e:
+            logger.error("Log cleanup failed", error=str(e))
 
     def run_once(self):
         start_time = datetime.now(timezone.utc)

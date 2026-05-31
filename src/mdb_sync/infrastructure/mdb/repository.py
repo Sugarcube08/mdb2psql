@@ -27,8 +27,11 @@ class MDBRepository:
             # ACQUIRE LOCK ONLY FOR THE READ PHASE
             with mdb_lock:
                 with pyodbc.connect(self.conn_str, readonly=True) as conn:
-                    conn.add_output_converter(pyodbc.SQL_TYPE_TIMESTAMP, robust_date_handler)
-                    conn.add_output_converter(pyodbc.SQL_TYPE_DATE, robust_date_handler)
+                    # MDBTools (Linux) needs manual date conversion, but the 
+                    # official Microsoft Driver (Windows) handles it natively.
+                    if "MDBTools" in self.conn_str:
+                        conn.add_output_converter(pyodbc.SQL_TYPE_TIMESTAMP, robust_date_handler)
+                        conn.add_output_converter(pyodbc.SQL_TYPE_DATE, robust_date_handler)
                     
                     cursor = conn.cursor()
                     cursor.execute(query, params)
